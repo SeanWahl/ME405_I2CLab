@@ -2,7 +2,10 @@
 @file mma845x.py
 This file contains a @b partly @b written MicroPython driver for the MMA8451 
 and MMA8452 accelerometers. It is intended to be used as a starting point for
-an exercise in a mechatronics course. 
+an exercise in a mechatronics course.
+
+Note: File has been modified by students Nathan Dodd, Lewis Kanagy, and Sean
+      Wahl and is now  complete enough to use an accelerometer.
 
 @author JR Ridgely
 @copyright GPL Version 3.0
@@ -116,7 +119,7 @@ class MMA845x:
         self.standby ()
 
         # Set the acceleration range to the given one if it's legal
-        # self.set_range (accel_range)
+        self._range = 2
 
 
     def active (self):
@@ -137,18 +140,19 @@ class MMA845x:
         be made, one must call @c active(). """
 
         if self._works:
-            reg1 = ord (self._i2c.mem_read (1, self._addr, CTRL_REG1))
+            reg1 = ord (self.i2c.mem_read (1, self.addr, CTRL_REG1))
             reg1 &= ~0x01
-            self._i2c.mem_write (chr (reg1 & 0xFF), self._addr, CTRL_REG1)
+            self.i2c.mem_write (chr (reg1 & 0xFF), self.addr, CTRL_REG1)
 
 
     def get_ax_bits (self):
         """ Get the X acceleration from the accelerometer in A/D bits and 
         return it.
         @return The measured X acceleration in A/D conversion bits """
-
-        print ('MMA845x clueless about X acceleration')
-        return 0
+        
+        if self._works:
+            x_bytes = self.i2c.mem_read(2, self.addr, OUT_X_MSB)
+        return x_bytes
 
 
     def get_ay_bits (self):
@@ -156,8 +160,9 @@ class MMA845x:
         return it.
         @return The measured Y acceleration in A/D conversion bits """
 
-        print ('MMA845x clueless about Y acceleration')
-        return 0
+        if self._works:
+            y_bytes = self.i2c.mem_read(2, self.addr, OUT_Y_MSB)
+        return y_bytes
 
 
     def get_az_bits (self):
@@ -165,17 +170,20 @@ class MMA845x:
         return it.
         @return The measured Z acceleration in A/D conversion bits """
 
-        print ('MMA845x clueless about Z acceleration')
-        return 0
+        if self._works:
+            z_bytes = self.i2c.mem_read(2, self.addr, OUT_Z_MSB)
+        return z_bytes
 
 
     def get_ax (self):
         """ Get the X acceleration from the accelerometer in g's, assuming
         that the accelerometer was correctly calibrated at the factory.
         @return The measured X acceleration in g's """
-
-        print ('MMA845x uncalibrated X')
-        return 0
+        if self._works:
+            x_int = int.from_bytes(self.get_ax_bits(),'big', True)
+            if x_int > 0xFFFF/2:
+                x_int -= 0xFFFF
+        return x_int/2**14
 
 
     def get_ay (self):
@@ -184,8 +192,11 @@ class MMA845x:
         measurement is adjusted for the range (2g, 4g, or 8g) setting.
         @return The measured Y acceleration in g's """
 
-        print ('MMA845x uncalibrated Y')
-        return 0
+        if self._works:
+            y_int = int.from_bytes(self.get_ay_bits(),'big', True)
+            if y_int > 0xFFFF/2:
+                y_int -= 0xFFFF
+        return y_int/2**14
 
 
     def get_az (self):
@@ -194,8 +205,11 @@ class MMA845x:
         measurement is adjusted for the range (2g, 4g, or 8g) setting.
         @return The measured Z acceleration in g's """
 
-        print ('MMA845x uncalibrated Z')
-        return 0
+        if self._works:
+            z_int = int.from_bytes(self.get_az_bits(),'big', True)
+            if z_int > 0xFFFF/2:
+                z_int -= 0xFFFF
+        return z_int/2**14
 
 
     def get_accels (self):
@@ -203,9 +217,8 @@ class MMA845x:
         measurement is adjusted for the range (2g, 4g, or 8g) setting.
         @return A tuple containing the X, Y, and Z accelerations in g's """
 
-        return (self.get_ax (), self.get_ay (), self.get_az ())
-
-
+        return (self.get_ax (), self.get_ay (), self.get_ax())
+        
     def __repr__ (self):
         """ 'Convert' The MMA845x accelerometer to a string. The string 
         contains information about the configuration and status of the
@@ -223,5 +236,13 @@ class MMA845x:
 
             return diag_str
 
-
+if __name__ == "__main__":
+    aye = pyb.I2C(1, pyb.I2C.CONTROLLER)
+    print(f'address = {pyb.I2C.scan(aye)}')
+    myAcc = MMA845x(aye, pyb.I2C.scan(aye)[0])
+    myAcc.active()
+    print(myAcc.get_ax())
+    print(myAcc.get_ay())
+    print(myAcc.get_az())
+    
 
